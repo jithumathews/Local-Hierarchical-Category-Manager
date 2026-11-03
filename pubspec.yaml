@@ -1,0 +1,49 @@
+name: scholigence
+description: "Local Hierarchical Category Manager with JSONPlaceholder auth."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.0-290.1.beta
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Models
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+
+  # HTTP
+  dio: ^5.7.0
+
+  # Local DB
+  sqflite: ^2.4.2
+  path: ^1.9.0
+
+  # Session persistence
+  shared_preferences: ^2.3.3
+
+  # Fonts
+  google_fonts: ^6.2.1
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+  # Code generation
+  build_runner: ^2.4.13
+  freezed: ^2.5.7
+  json_serializable: ^6.9.0
+
+flutter:
+  uses-material-design: true

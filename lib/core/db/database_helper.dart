@@ -23,9 +23,10 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -38,11 +39,17 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE categories (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL,
         name       TEXT    NOT NULL,
         parent_id  INTEGER NULL REFERENCES categories(id) ON DELETE CASCADE,
         created_at TEXT    NOT NULL
       )
     ''');
+
+    // Index on user_id for multi-tenant scoping
+    await db.execute(
+      'CREATE INDEX idx_categories_user_id ON categories(user_id)',
+    );
 
     // Index on parent_id for fast child lookups
     await db.execute(
@@ -54,12 +61,28 @@ class DatabaseHelper {
       'CREATE INDEX idx_categories_name ON categories(LOWER(name))',
     );
 
-    // Unique constraint: same name (case-insensitive) under the same parent.
-    // COALESCE maps NULL parent to 0 so the unique index covers root nodes too.
+    // Unique constraint per user: same name (case-insensitive) under same parent
     await db.execute('''
       CREATE UNIQUE INDEX idx_categories_unique_name
-      ON categories(COALESCE(parent_id, 0), LOWER(name))
+      ON categories(user_id, COALESCE(parent_id, 0), LOWER(name))
     ''');
   }
-}
 
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add user_id column with default value 1 for existing categories
+      await db.execute(
+        'ALTER TABLE categories ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id)',
+      );
+      // Drop old unique index and recreate per-user
+      await db.execute('DROP INDEX IF EXISTS idx_categories_unique_name');
+      await db.execute('''
+        CREATE UNIQUE INDEX idx_categories_unique_name
+        ON categories(user_id, COALESCE(parent_id, 0), LOWER(name))
+      ''');
+    }
+  }
+}

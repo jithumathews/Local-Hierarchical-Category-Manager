@@ -7,6 +7,7 @@ part 'category_model.freezed.dart';
 class Category with _$Category {
   const factory Category({
     required int id,
+    required int userId,
     required String name,
     int? parentId,
     required DateTime createdAt,
@@ -16,12 +17,14 @@ class Category with _$Category {
 
   factory Category.fromMap(Map<String, dynamic> map) => Category(
         id: map['id'] as int,
+        userId: map['user_id'] as int? ?? 1,
         name: map['name'] as String,
         parentId: map['parent_id'] as int?,
         createdAt: DateTime.parse(map['created_at'] as String),
       );
 
   Map<String, dynamic> toMap() => {
+        'user_id': userId,
         'name': name,
         if (parentId != null) 'parent_id': parentId,
         'created_at': createdAt.toIso8601String(),
@@ -58,4 +61,3 @@ class PagedResult<T> with _$PagedResult<T> {
     required int totalCount,
   }) = _PagedResult<T>;
 }
-

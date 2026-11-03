@@ -17,12 +17,48 @@ class AuthRepository {
   /// Returns the persisted user ID, or null if not logged in.
   int? get persistedUserId => _prefs.getInt(_kUserIdKey);
 
-  /// Fetches user [id] from JSONPlaceholder and persists the session.
-  Future<User> login(int id) async {
+  /// Authenticates using [username] and [email], matching against JSONPlaceholder users.
+  Future<User> loginWithCredentials({
+    required String username,
+    required String email,
+  }) async {
+    final cleanUsername = username.trim();
+    final cleanEmail = email.trim();
+
+    if (cleanUsername.isEmpty || cleanEmail.isEmpty) {
+      throw const AppException('Username and email are required.');
+    }
+
+    try {
+      final response = await _dio.get('/users');
+      final list = (response.data as List)
+          .map((e) => User.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+      final matched = list.where(
+        (u) =>
+            u.username.trim().toLowerCase() == cleanUsername.toLowerCase() &&
+            u.email.trim().toLowerCase() == cleanEmail.toLowerCase(),
+      ).firstOrNull;
+
+      if (matched == null) {
+        throw const AppException(
+          'Invalid username or email. Please check your credentials and try again.',
+        );
+      }
+
+      await _prefs.setInt(_kUserIdKey, matched.id);
+      return matched;
+    } on DioException catch (e) {
+      throw AppException(_mapDioError(e));
+    }
+  }
+
+  /// Fetches user by [id] (used for session restoration).
+  Future<User> fetchUserById(int id) async {
     try {
       final response = await _dio.get('/users/$id');
       final user = User.fromJson(response.data as Map<String, dynamic>);
-      await _prefs.setInt(_kUserIdKey, user.id);
       return user;
     } on DioException catch (e) {
       throw AppException(_mapDioError(e));
@@ -34,7 +70,7 @@ class AuthRepository {
     final id = persistedUserId;
     if (id == null) return null;
     try {
-      return await login(id);
+      return await fetchUserById(id);
     } catch (_) {
       return null;
     }
@@ -55,7 +91,7 @@ class AuthRepository {
         return 'No internet connection.';
       case DioExceptionType.badResponse:
         if (e.response?.statusCode == 404) {
-          return 'User not found. Please use an ID from 1 to 10.';
+          return 'User not found.';
         }
         return 'Server error (${e.response?.statusCode}).';
       default:
@@ -63,4 +99,3 @@ class AuthRepository {
     }
   }
 }
-

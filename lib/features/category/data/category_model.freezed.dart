@@ -18,6 +18,7 @@ final _privateConstructorUsedError = UnsupportedError(
 /// @nodoc
 mixin _$Category {
   int get id => throw _privateConstructorUsedError;
+  int get userId => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
   int? get parentId => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
@@ -34,7 +35,13 @@ abstract class $CategoryCopyWith<$Res> {
   factory $CategoryCopyWith(Category value, $Res Function(Category) then) =
       _$CategoryCopyWithImpl<$Res, Category>;
   @useResult
-  $Res call({int id, String name, int? parentId, DateTime createdAt});
+  $Res call({
+    int id,
+    int userId,
+    String name,
+    int? parentId,
+    DateTime createdAt,
+  });
 }
 
 /// @nodoc
@@ -53,6 +60,7 @@ class _$CategoryCopyWithImpl<$Res, $Val extends Category>
   @override
   $Res call({
     Object? id = null,
+    Object? userId = null,
     Object? name = null,
     Object? parentId = freezed,
     Object? createdAt = null,
@@ -62,6 +70,10 @@ class _$CategoryCopyWithImpl<$Res, $Val extends Category>
             id: null == id
                 ? _value.id
                 : id // ignore: cast_nullable_to_non_nullable
+                      as int,
+            userId: null == userId
+                ? _value.userId
+                : userId // ignore: cast_nullable_to_non_nullable
                       as int,
             name: null == name
                 ? _value.name
@@ -90,7 +102,13 @@ abstract class _$$CategoryImplCopyWith<$Res>
   ) = __$$CategoryImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({int id, String name, int? parentId, DateTime createdAt});
+  $Res call({
+    int id,
+    int userId,
+    String name,
+    int? parentId,
+    DateTime createdAt,
+  });
 }
 
 /// @nodoc
@@ -108,6 +126,7 @@ class __$$CategoryImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? id = null,
+    Object? userId = null,
     Object? name = null,
     Object? parentId = freezed,
     Object? createdAt = null,
@@ -117,6 +136,10 @@ class __$$CategoryImplCopyWithImpl<$Res>
         id: null == id
             ? _value.id
             : id // ignore: cast_nullable_to_non_nullable
+                  as int,
+        userId: null == userId
+            ? _value.userId
+            : userId // ignore: cast_nullable_to_non_nullable
                   as int,
         name: null == name
             ? _value.name
@@ -140,6 +163,7 @@ class __$$CategoryImplCopyWithImpl<$Res>
 class _$CategoryImpl extends _Category {
   const _$CategoryImpl({
     required this.id,
+    required this.userId,
     required this.name,
     this.parentId,
     required this.createdAt,
@@ -147,6 +171,8 @@ class _$CategoryImpl extends _Category {
 
   @override
   final int id;
+  @override
+  final int userId;
   @override
   final String name;
   @override
@@ -156,7 +182,7 @@ class _$CategoryImpl extends _Category {
 
   @override
   String toString() {
-    return 'Category(id: $id, name: $name, parentId: $parentId, createdAt: $createdAt)';
+    return 'Category(id: $id, userId: $userId, name: $name, parentId: $parentId, createdAt: $createdAt)';
   }
 
   @override
@@ -165,6 +191,7 @@ class _$CategoryImpl extends _Category {
         (other.runtimeType == runtimeType &&
             other is _$CategoryImpl &&
             (identical(other.id, id) || other.id == id) &&
+            (identical(other.userId, userId) || other.userId == userId) &&
             (identical(other.name, name) || other.name == name) &&
             (identical(other.parentId, parentId) ||
                 other.parentId == parentId) &&
@@ -173,7 +200,8 @@ class _$CategoryImpl extends _Category {
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, id, name, parentId, createdAt);
+  int get hashCode =>
+      Object.hash(runtimeType, id, userId, name, parentId, createdAt);
 
   /// Create a copy of Category
   /// with the given fields replaced by the non-null parameter values.
@@ -187,6 +215,7 @@ class _$CategoryImpl extends _Category {
 abstract class _Category extends Category {
   const factory _Category({
     required final int id,
+    required final int userId,
     required final String name,
     final int? parentId,
     required final DateTime createdAt,
@@ -195,6 +224,8 @@ abstract class _Category extends Category {
 
   @override
   int get id;
+  @override
+  int get userId;
   @override
   String get name;
   @override

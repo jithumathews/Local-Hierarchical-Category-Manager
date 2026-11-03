@@ -13,23 +13,58 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _controller = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   String? _errorText;
+  OverlayEntry? _snackBarEntry;
 
   @override
   void dispose() {
-    _controller.dispose();
+    _snackBarEntry?.remove();
+    _snackBarEntry = null;
+    _usernameController.dispose();
+    _emailController.dispose();
     super.dispose();
+  }
+
+  void _showTopAlertSnackBar(String message) {
+    if (!mounted) return;
+
+    _snackBarEntry?.remove();
+    _snackBarEntry = null;
+
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+
+    entry = OverlayEntry(
+      builder: (context) => _TopAlertSnackBar(
+        message: message,
+        onDismiss: () {
+          if (entry.mounted) {
+            entry.remove();
+          }
+          if (_snackBarEntry == entry) {
+            _snackBarEntry = null;
+          }
+        },
+      ),
+    );
+
+    _snackBarEntry = entry;
+    overlay.insert(entry);
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _errorText = null);
 
-    final id = int.tryParse(_controller.text.trim());
-    if (id == null) return;
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
 
-    await ref.read(authControllerProvider.notifier).login(id);
+    await ref.read(authControllerProvider.notifier).login(
+          username: username,
+          email: email,
+        );
 
     final authState = ref.read(authControllerProvider);
     if (!mounted) return;
@@ -37,13 +72,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     authState.when(
       data: (user) {
         if (user != null) {
+          _snackBarEntry?.remove();
+          _snackBarEntry = null;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const ProfileScreen()),
           );
         }
       },
       loading: () {},
-      error: (e, _) => setState(() => _errorText = e.toString()),
+      error: (e, _) {
+        final message = e.toString();
+        setState(() => _errorText = message);
+        _showTopAlertSnackBar(message);
+      },
     );
   }
 
@@ -59,7 +100,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Card(
                 elevation: 0,
                 color: cs.surfaceContainerHighest,
@@ -93,31 +134,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Sign in to manage your categories',
+                          'Sign in with your username and email',
                           style: tt.bodyMedium?.copyWith(
                             color: cs.onSurfaceVariant,
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 24),
 
-                        // ID field
+                        // Username field
                         TextFormField(
-                          controller: _controller,
-                          keyboardType: TextInputType.number,
+                          controller: _usernameController,
                           enabled: !isLoading,
+                          textInputAction: TextInputAction.next,
                           decoration: const InputDecoration(
-                            labelText: 'User ID (1–10)',
-                            hintText: 'Use any ID from 1 to 10',
+                            labelText: 'Username',
+                            hintText: 'e.g. Bret',
                             prefixIcon: Icon(Icons.person_outline),
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Please enter a user ID.';
+                              return 'Please enter your username.';
                             }
-                            final n = int.tryParse(value.trim());
-                            if (n == null || n < 1 || n > 10) {
-                              return 'Enter a number between 1 and 10.';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Email field
+                        TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.done,
+                          enabled: !isLoading,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            hintText: 'e.g. Sincere@april.biz',
+                            prefixIcon: Icon(Icons.email_outlined),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your email.';
+                            }
+                            if (!value.contains('@') || !value.contains('.')) {
+                              return 'Please enter a valid email address.';
                             }
                             return null;
                           },
@@ -125,8 +185,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Inline error
-                        if (_errorText != null)
+                        // Hint box for JSONPlaceholder sample logins
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: cs.outlineVariant.withAlpha(128)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 18,
+                                color: cs.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Demo hint: Username "Bret" & Email "Sincere@april.biz"',
+                                  style: tt.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Inline error banner
+                        if (_errorText != null) ...[
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
@@ -153,8 +244,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ],
                             ),
                           ),
-
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 14),
+                        ],
 
                         // Login button
                         FilledButton(
@@ -183,3 +274,144 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
+/// Floating alert SnackBar animated from the top of the screen.
+class _TopAlertSnackBar extends StatefulWidget {
+  const _TopAlertSnackBar({
+    required this.message,
+    required this.onDismiss,
+  });
+
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  State<_TopAlertSnackBar> createState() => _TopAlertSnackBarState();
+}
+
+class _TopAlertSnackBarState extends State<_TopAlertSnackBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<Offset> _offsetAnimation;
+  late final Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+
+    _offsetAnimation = Tween<Offset>(
+      begin: const Offset(0, -1.2),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeIn,
+    );
+
+    _controller.forward();
+
+    // Auto-dismiss after 3.5 seconds
+    Future.delayed(const Duration(milliseconds: 3500), () {
+      if (mounted) {
+        _dismiss();
+      }
+    });
+  }
+
+  void _dismiss() {
+    if (!mounted) return;
+    _controller.reverse().then((_) {
+      if (mounted) {
+        widget.onDismiss();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    return Positioned(
+      top: topPadding + 12,
+      left: 16,
+      right: 16,
+      child: SlideTransition(
+        position: _offsetAnimation,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Material(
+            color: Colors.transparent,
+            child: GestureDetector(
+              onVerticalDragUpdate: (details) {
+                if (details.primaryDelta != null && details.primaryDelta! < -4) {
+                  _dismiss();
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: cs.error,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 12,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      color: cs.onError,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        widget.message,
+                        style: TextStyle(
+                          color: cs.onError,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: _dismiss,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.close,
+                          color: cs.onError,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

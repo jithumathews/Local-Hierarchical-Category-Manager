@@ -2,25 +2,32 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/category_model.dart';
 import '../../../core/providers.dart';
+import '../../auth/presentation/auth_controller.dart';
 
 // ─── Tree ────────────────────────────────────────────────────────────────────
 
 class CategoryTreeNotifier extends AsyncNotifier<List<CategoryNode>> {
   @override
   Future<List<CategoryNode>> build() async {
-    return ref.read(categoryRepositoryProvider).getTree();
+    final user = ref.watch(authControllerProvider).valueOrNull;
+    if (user == null) return [];
+    return ref.read(categoryRepositoryProvider).getTree(user.id);
   }
 
   Future<void> add(String name, int? parentId) async {
+    final user = ref.read(authControllerProvider).valueOrNull;
+    if (user == null) return;
     final repo = ref.read(categoryRepositoryProvider);
-    await repo.addCategory(name, parentId);
+    await repo.addCategory(name, parentId, user.id);
     ref.invalidateSelf();
     await future; // wait for rebuild
   }
 
   Future<void> delete(int id) async {
+    final user = ref.read(authControllerProvider).valueOrNull;
+    if (user == null) return;
     final repo = ref.read(categoryRepositoryProvider);
-    await repo.deleteCategory(id);
+    await repo.deleteCategory(id, user.id);
     ref.invalidateSelf();
     await future;
   }
@@ -52,6 +59,10 @@ class ExpandedIdsNotifier extends Notifier<Set<int>> {
   void expandAll(Iterable<int> ids) {
     state = {...state, ...ids};
   }
+
+  void clear() {
+    state = {};
+  }
 }
 
 final expandedIdsProvider =
@@ -75,12 +86,13 @@ final searchLimitProvider = StateProvider<int?>((ref) => null);
 
 final searchResultsProvider =
     FutureProvider<PagedResult<CategorySearchResult>>((ref) async {
+  final user = ref.watch(authControllerProvider).valueOrNull;
   final query = ref.watch(searchQueryProvider);
   final page = ref.watch(searchPageProvider);
   final limit = ref.watch(searchLimitProvider);
   final repo = ref.watch(categoryRepositoryProvider);
 
-  if (query.trim().isEmpty) {
+  if (user == null || query.trim().isEmpty) {
     return PagedResult<CategorySearchResult>(
       items: [],
       page: 1,
@@ -89,5 +101,11 @@ final searchResultsProvider =
     );
   }
 
-  return repo.search(query, limit: limit, page: page, pageSize: 20);
+  return repo.search(
+    query,
+    userId: user.id,
+    limit: limit,
+    page: page,
+    pageSize: 20,
+  );
 });

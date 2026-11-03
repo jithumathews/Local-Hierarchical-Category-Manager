@@ -12,9 +12,14 @@ class CategoryRepository {
   // Tree
   // ─────────────────────────────────────────────
 
-  /// Fetches all rows once and builds the tree in O(n).
-  Future<List<CategoryNode>> getTree() async {
-    final rows = await _db.query('categories', orderBy: 'name ASC');
+  /// Fetches all rows for [userId] once and builds the tree in O(n).
+  Future<List<CategoryNode>> getTree(int userId) async {
+    final rows = await _db.query(
+      'categories',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      orderBy: 'name ASC',
+    );
     final categories = rows.map(Category.fromMap).toList();
     return _buildTree(categories);
   }
@@ -59,8 +64,8 @@ class CategoryRepository {
   // Mutations
   // ─────────────────────────────────────────────
 
-  /// Validates, checks duplicates, and inserts a new category.
-  Future<Category> addCategory(String name, int? parentId) async {
+  /// Validates, checks duplicates per user, and inserts a new category.
+  Future<Category> addCategory(String name, int? parentId, int userId) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
       throw const AppException('Name cannot be empty.');
@@ -69,11 +74,12 @@ class CategoryRepository {
       throw const AppException('Name must be 50 characters or less.');
     }
 
-    // Duplicate check: same trimmed name (case-insensitive) under same parent.
+    // Duplicate check for this specific user:
+    // same trimmed name (case-insensitive) under same parent.
     final existing = await _db.query(
       'categories',
-      where: 'LOWER(name) = LOWER(?) AND parent_id IS ?',
-      whereArgs: [trimmed, parentId],
+      where: 'user_id = ? AND LOWER(name) = LOWER(?) AND parent_id IS ?',
+      whereArgs: [userId, trimmed, parentId],
     );
     if (existing.isNotEmpty) {
       throw AppException('"$trimmed" already exists here.');
@@ -82,12 +88,14 @@ class CategoryRepository {
     final now = DateTime.now().toIso8601String();
     final category = Category(
       id: 0, // placeholder; overwritten by autoincrement
+      userId: userId,
       name: trimmed,
       parentId: parentId,
       createdAt: DateTime.now(),
     );
 
     final id = await _db.insert('categories', {
+      'user_id': userId,
       'name': trimmed,
       'parent_id': parentId,
       'created_at': now,
@@ -96,28 +104,33 @@ class CategoryRepository {
     return category.copyWith(id: id);
   }
 
-  /// Deletes a category (and its entire subtree via CASCADE).
-  Future<void> deleteCategory(int id) async {
-    await _db.delete('categories', where: 'id = ?', whereArgs: [id]);
+  /// Deletes a category for [userId] (and its entire subtree via CASCADE).
+  Future<void> deleteCategory(int id, int userId) async {
+    await _db.delete(
+      'categories',
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [id, userId],
+    );
   }
 
   // ─────────────────────────────────────────────
   // Search
   // ─────────────────────────────────────────────
 
-  /// Searches by name substring, returns paginated results with full context.
+  /// Searches categories belonging to [userId] by name substring.
   Future<PagedResult<CategorySearchResult>> search(
     String query, {
+    required int userId,
     int? limit,
     int page = 1,
     int pageSize = 20,
   }) async {
     final q = query.trim().toLowerCase();
 
-    // Count matches
+    // Count matches for this user
     final countResult = await _db.rawQuery(
-      "SELECT COUNT(*) AS cnt FROM categories WHERE LOWER(name) LIKE ?",
-      ['%$q%'],
+      "SELECT COUNT(*) AS cnt FROM categories WHERE user_id = ? AND LOWER(name) LIKE ?",
+      [userId, '%$q%'],
     );
     int totalCount = (countResult.first['cnt'] as int?) ?? 0;
 
@@ -136,14 +149,18 @@ class CategoryRepository {
 
     // Fetch this page of matches
     final rows = await _db.rawQuery(
-      "SELECT * FROM categories WHERE LOWER(name) LIKE ? ORDER BY name ASC LIMIT ? OFFSET ?",
-      ['%$q%', effectivePageSize, offset],
+      "SELECT * FROM categories WHERE user_id = ? AND LOWER(name) LIKE ? ORDER BY name ASC LIMIT ? OFFSET ?",
+      [userId, '%$q%', effectivePageSize, offset],
     );
 
     final matches = rows.map(Category.fromMap).toList();
 
-    // Fetch all rows for building context (parent, children, path)
-    final allRows = await _db.query('categories');
+    // Fetch this user's rows for building context (parent, children, path)
+    final allRows = await _db.query(
+      'categories',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
     final all = allRows.map(Category.fromMap).toList();
     final byId = {for (final c in all) c.id: c};
     final byParent = <int?, List<Category>>{};
@@ -186,20 +203,42 @@ class CategoryRepository {
   }
 
   /// Gets the path from root to [id] using a recursive CTE.
-  Future<List<Category>> getPath(int id) async {
-    final rows = await _db.rawQuery('''
-      WITH RECURSIVE ancestors(id, name, parent_id, created_at, depth) AS (
-        SELECT id, name, parent_id, created_at, 0
-        FROM categories WHERE id = ?
-        UNION ALL
-        SELECT c.id, c.name, c.parent_id, c.created_at, a.depth + 1
-        FROM categories c
-        JOIN ancestors a ON c.id = a.parent_id
-      )
-      SELECT id, name, parent_id, created_at FROM ancestors
-      ORDER BY depth DESC
-    ''', [id]);
+  Future<List<Category>> getPath(int id, {int? userId}) async {
+    final String query;
+    final List<Object?> args;
 
+    if (userId != null) {
+      query = '''
+        WITH RECURSIVE ancestors(id, user_id, name, parent_id, created_at, depth) AS (
+          SELECT id, user_id, name, parent_id, created_at, 0
+          FROM categories WHERE id = ? AND user_id = ?
+          UNION ALL
+          SELECT c.id, c.user_id, c.name, c.parent_id, c.created_at, a.depth + 1
+          FROM categories c
+          JOIN ancestors a ON c.id = a.parent_id
+          WHERE c.user_id = ?
+        )
+        SELECT id, user_id, name, parent_id, created_at FROM ancestors
+        ORDER BY depth DESC
+      ''';
+      args = [id, userId, userId];
+    } else {
+      query = '''
+        WITH RECURSIVE ancestors(id, user_id, name, parent_id, created_at, depth) AS (
+          SELECT id, user_id, name, parent_id, created_at, 0
+          FROM categories WHERE id = ?
+          UNION ALL
+          SELECT c.id, c.user_id, c.name, c.parent_id, c.created_at, a.depth + 1
+          FROM categories c
+          JOIN ancestors a ON c.id = a.parent_id
+        )
+        SELECT id, user_id, name, parent_id, created_at FROM ancestors
+        ORDER BY depth DESC
+      ''';
+      args = [id];
+    }
+
+    final rows = await _db.rawQuery(query, args);
     return rows.map(Category.fromMap).toList();
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../presentation/auth_controller.dart';
+import '../../category/presentation/category_controller.dart';
 import '../../category/presentation/category_screen.dart';
 import 'login_screen.dart';
 
@@ -24,6 +25,8 @@ class ProfileScreen extends ConsumerWidget {
             tooltip: 'Logout',
             onPressed: () async {
               await ref.read(authControllerProvider.notifier).logout();
+              ref.read(expandedIdsProvider.notifier).clear();
+              ref.read(searchQueryProvider.notifier).clear();
               if (context.mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),

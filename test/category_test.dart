@@ -126,10 +126,36 @@ void main() {
       expect((1 / 10).ceil(), 1);
     });
   });
+
+  group('Multi-tenant isolation', () {
+    test('different users have isolated categories in tree building', () {
+      final allCategories = [
+        _cat(1, 'User 1 Root', null, userId: 1),
+        _cat(2, 'User 1 Child', 1, userId: 1),
+        _cat(3, 'User 2 Root', null, userId: 2),
+        _cat(4, 'User 2 Child', 3, userId: 2),
+      ];
+
+      final user1Cats = allCategories.where((c) => c.userId == 1).toList();
+      final user2Cats = allCategories.where((c) => c.userId == 2).toList();
+
+      final tree1 = buildTree(user1Cats);
+      final tree2 = buildTree(user2Cats);
+
+      expect(tree1.length, 1);
+      expect(tree1.first.category.name, 'User 1 Root');
+      expect(tree1.first.children.first.category.name, 'User 1 Child');
+
+      expect(tree2.length, 1);
+      expect(tree2.first.category.name, 'User 2 Root');
+      expect(tree2.first.children.first.category.name, 'User 2 Child');
+    });
+  });
 }
 
-Category _cat(int id, String name, int? parentId) => Category(
+Category _cat(int id, String name, int? parentId, {int userId = 1}) => Category(
       id: id,
+      userId: userId,
       name: name,
       parentId: parentId,
       createdAt: DateTime(2024),

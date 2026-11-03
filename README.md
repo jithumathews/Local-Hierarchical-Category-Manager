@@ -110,6 +110,14 @@ The `getPath(id)` method uses a SQLite recursive CTE that walks upward through `
 
 ## Design Decisions
 
+### Multi-Tenancy (Per-User Data Isolation)
+
+Categories and subcategories are strictly scoped to the logged-in user:
+- SQLite table includes a `user_id INTEGER NOT NULL` column with index `idx_categories_user_id`.
+- The uniqueness constraint `UNIQUE(user_id, COALESCE(parent_id, 0), LOWER(name))` ensures that duplicate checking is scoped per user. Different users can independently create categories with the same name.
+- When User 1 logs in, only User 1's tree, search results, and nodes are queried and shown.
+- Logging out invalidates the tree and search states; User 2 sees only their own isolated categories.
+
 ### The NULL-parent duplicate gotcha
 
 SQL `UNIQUE` indexes skip rows where any indexed column is NULL. That means `UNIQUE(parent_id, LOWER(name))` would allow two root categories with the same name (both `parent_id = NULL`). We solve this two ways:

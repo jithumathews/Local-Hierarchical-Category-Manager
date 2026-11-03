@@ -111,42 +111,56 @@ class _SearchResultCardState extends State<SearchResultCard> {
               ],
 
               // Expanded mini-tree
-              if (_expanded) ...[
-                const Divider(height: 20),
-                Text(
-                  'Full hierarchy',
-                  style: tt.labelSmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                for (int i = 0; i < path.length; i++)
-                  Padding(
-                    padding: EdgeInsets.only(left: 20.0 * i, top: 2),
-                    child: Row(
-                      children: [
-                        if (i > 0)
-                          Icon(
-                            Icons.subdirectory_arrow_right,
-                            size: 14,
-                            color: cs.onSurfaceVariant.withAlpha(128),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
+                alignment: Alignment.topCenter,
+                child: _expanded
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Divider(height: 20),
+                          Text(
+                            'Full hierarchy',
+                            style: tt.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurfaceVariant,
+                            ),
                           ),
-                        const SizedBox(width: 4),
-                        Text(
-                          path[i].name,
-                          style: tt.bodySmall?.copyWith(
-                            fontWeight: path[i].id == result.match.id
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            color: path[i].id == result.match.id
-                                ? cs.primary
-                                : null,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
+                          const SizedBox(height: 8),
+                          for (int i = 0; i < path.length; i++)
+                            Padding(
+                              padding: EdgeInsets.only(left: 18.0 * i, top: 4),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    i == 0
+                                        ? Icons.folder_outlined
+                                        : Icons.subdirectory_arrow_right_rounded,
+                                    size: 16,
+                                    color: path[i].id == result.match.id
+                                        ? cs.primary
+                                        : cs.onSurfaceVariant.withAlpha(140),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    path[i].name,
+                                    style: tt.bodySmall?.copyWith(
+                                      fontWeight: path[i].id == result.match.id
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: path[i].id == result.match.id
+                                          ? cs.primary
+                                          : cs.onSurface,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ],
           ),
         ),

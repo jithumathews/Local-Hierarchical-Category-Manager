@@ -1,148 +1,207 @@
 # Scholigence — Local Hierarchical Category Manager
 
-A Flutter app with mock login via JSONPlaceholder, a profile screen, and an unlimited-depth category tree stored locally in SQLite.
+A cross-platform Flutter application featuring mock authentication via JSONPlaceholder, a user profile screen, and an unlimited-depth hierarchical category tree stored locally in SQLite with multi-tenant isolation, recursive search, pagination, and a modern black-and-white minimalist design.
 
 ---
 
-## Setup & Run
+## 1. Setup Instructions
+
+### Prerequisites
+- [Flutter SDK](https://flutter.dev/docs/get-started/install) (v3.10+ / Dart 3.10+)
+- Android Studio / Xcode / VS Code configured with Flutter and Dart extensions
+- Connected device, simulator/emulator, or desktop target (Windows / macOS / Linux)
+
+### Installation & Execution
 
 ```bash
-# 1. Install dependencies
+# 1. Clone the repository and navigate into the project directory
+cd scholigence
+
+# 2. Install dependencies
 flutter pub get
 
-# 2. Generate freezed / json_serializable code
+# 3. Generate Freezed and JSON serialization files
 dart run build_runner build --delete-conflicting-outputs
 
-# 3. Run the app
+# 4. Run static analysis (verifies zero warnings/errors)
+flutter analyze
+
+# 5. Run automated unit tests
+flutter test
+
+# 6. Launch the application
 flutter run
 ```
 
+### Demo Credentials
+Login authenticates against the live JSONPlaceholder `/users` API:
+- **Username:** `Bret` | **Email:** `Sincere@april.biz` *(User ID 1)*
+- **Username:** `Antonette` | **Email:** `Shanna@melissa.tv` *(User ID 2)*
+- *(Any of the 10 JSONPlaceholder users can be used. Entering incorrect credentials triggers an animated top alert SnackBar).*
+
 ---
 
-## Architecture
+## 2. Project Architecture
+
+The application adopts a **3-Layer Architecture** (Presentation → Repository → Data Source) without unnecessary use-case abstractions:
 
 ```
-Presentation → Repository → Data source
+┌────────────────────────────────────────────────────────┐
+│                   Presentation Layer                   │
+│   Flutter Widgets (M3 UI) + Riverpod Controllers       │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+┌──────────────────────────▼─────────────────────────────┐
+│                    Repository Layer                    │
+│   Business logic, validations, tree & path algorithms, │
+│   SQL queries, error mapping (AppException)           │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+┌──────────────────────────▼─────────────────────────────┐
+│                   Data Source Layer                    │
+│   Dio (Remote HTTP REST API) & sqflite (Local SQLite) │
+└────────────────────────────────────────────────────────┘
 ```
 
-A simple 3-layer architecture with no use-case classes:
-
-| Layer | Responsibility |
-|---|---|
-| **Presentation** | Flutter widgets + Riverpod controllers (`AsyncNotifier`/`Notifier`) |
-| **Repository** | All business logic, SQL queries, validation, tree & path building |
-| **Data source** | `Dio` (HTTP) and `sqflite` (SQLite) — never touched by the UI |
+### Directory Structure
 
 ```
 lib/
-  main.dart                    ← ProviderScope entry point
-  app.dart                     ← MaterialApp, theme, root router
-  core/
-    theme/app_theme.dart       ← Material 3 light/dark themes (Poppins font)
-    error/app_exception.dart   ← User-friendly exception type
-    db/database_helper.dart    ← SQLite open/create, foreign keys, indexes
-    providers.dart             ← Dio, DB, SharedPreferences, repositories
-  features/
-    auth/
-      data/user_model.dart         ← freezed + json_serializable User & Company
-      data/auth_repository.dart    ← JSONPlaceholder fetch + SharedPreferences
-      presentation/auth_controller.dart
-      presentation/login_screen.dart
-      presentation/profile_screen.dart
-    category/
-      data/category_model.dart          ← Category, CategoryNode, PagedResult
-      data/category_repository.dart     ← All SQL + tree/path logic
-      presentation/category_controller.dart
-      presentation/category_screen.dart
-      presentation/widgets/
-        category_tree_tile.dart
-        search_result_card.dart
-        add_category_dialog.dart
-        empty_state.dart
-        error_view.dart
+├── main.dart                          # App entry point with ProviderScope
+├── app.dart                           # MaterialApp, theme configuration & root router
+├── core/
+│   ├── theme/
+│   │   └── app_theme.dart             # Black & white minimalist M3 light/dark themes
+│   ├── error/
+│   │   └── app_exception.dart         # User-friendly custom exception class
+│   ├── db/
+│   │   └── database_helper.dart       # SQLite database initialization, PRAGMA & indexes
+│   └── providers.dart                 # Global Riverpod providers (Dio, DB, Repos)
+└── features/
+    ├── auth/
+    │   ├── data/
+    │   │   ├── user_model.dart        # Freezed + json_serializable User & Company models
+    │   │   └── auth_repository.dart   # JSONPlaceholder API auth & session persistence
+    │   └── presentation/
+    │       ├── auth_controller.dart   # AsyncNotifier for user auth session
+    │       ├── login_screen.dart      # Login UI with top animated error SnackBar
+    │       └── profile_screen.dart    # User profile & session logout
+    └── category/
+        ├── data/
+        │   ├── category_model.dart    # Category, CategoryNode, PagedResult models
+        │   └── category_repository.dart # SQLite queries, O(n) tree & CTE path logic
+        └── presentation/
+            ├── category_controller.dart # CategoryTreeNotifier, search & filter providers
+            ├── category_screen.dart   # Category tree & search screen with limit chips
+            └── widgets/
+                ├── category_tree_tile.dart  # Recursive tree tile with expand/collapse
+                ├── search_result_card.dart  # Search result card with breadcrumb & mini-tree
+                ├── add_category_dialog.dart # Add category / subcategory dialog
+                ├── empty_state.dart         # Reusable empty state view
+                └── error_view.dart          # Error & retry view
 ```
 
 ---
 
-## Tech Stack
+## 3. State-Management Approach
 
-| Concern | Choice |
-|---|---|
-| State management | `flutter_riverpod` — `Notifier` / `AsyncNotifier`, no codegen for providers |
-| Models | `freezed` + `json_serializable` |
-| HTTP | `dio` |
-| Local DB | `sqflite` + `path` |
-| Session | `shared_preferences` |
-| Fonts | `google_fonts` (Poppins) |
+The project utilizes **`flutter_riverpod`** with explicit `Notifier` and `AsyncNotifier` classes (without code generation for providers):
 
-### Why Riverpod?
-
-`flutter_riverpod` with `AsyncNotifier` gives compile-safe, testable state management with minimal boilerplate. `AsyncValue` (loading / data / error) maps perfectly to our UI states without manual flag juggling.
-
-### Why sqflite?
-
-Categories are a parent-child relational structure. SQLite's foreign keys give cascading deletes for free, and its support for recursive CTEs makes path queries elegant. sqflite keeps it all on-device with zero network dependency.
-
----
-
-## Hierarchy Approach
-
-**Flat table with recursive in-Dart build:**
-
-All categories are stored in a single flat table with a `parent_id` column. When displaying the tree, the repository fetches **all rows in one query** and groups them into a `Map<int?, List<Category>>` by `parentId`. A recursive Dart function then builds the tree from that map in **O(n)** — no N+1 queries.
-
-**Recursive CTE for paths:**
-
-The `getPath(id)` method uses a SQLite recursive CTE that walks upward through `parent_id` links until it reaches NULL, then reverses the order to produce root → node. This works for any depth with no additional round trips.
+- **Compile-time safety & declarative data flow:** Riverpod provides dependency injection and reactive state synchronization across the app without `BuildContext` coupling.
+- **`AsyncNotifier` for async operations:** Used in `AuthController` and `CategoryTreeNotifier`. State is modeled using `AsyncValue<T>` (`loading`, `data`, `error`), eliminating manual boolean flags.
+- **Reactive UI updates:** When mutations occur (e.g., adding or deleting a category), calling `ref.invalidateSelf()` causes the tree to re-fetch and rebuild automatically.
+- **Provider composition:** Search results reactively depend on `searchQueryProvider`, `searchPageProvider`, `searchLimitProvider`, and the logged-in user:
+  ```dart
+  final searchResultsProvider = FutureProvider<PagedResult<CategorySearchResult>>((ref) async {
+    final user = ref.watch(authControllerProvider).valueOrNull;
+    final query = ref.watch(searchQueryProvider);
+    final page = ref.watch(searchPageProvider);
+    final limit = ref.watch(searchLimitProvider);
+    ...
+  });
+  ```
 
 ---
 
-## Search & Pagination
+## 4. Local Database Selection
 
-- Match: `LOWER(name) LIKE '%query%'`, ordered alphabetically.
-- `COUNT(*)` gives `totalCount` before fetching a page.
-- `limit` (optional): caps `totalCount` to `min(totalCount, limit)`, so no more than `limit` items are ever returned across all pages.
-- Pagination uses SQL `LIMIT / OFFSET` with configurable `pageSize` (default 20).
-- For each match on the page, context is built (parent, direct children, root-to-match path) using the full in-memory category map.
-- Search is debounced 300 ms in the UI to avoid spamming the database.
+The local database of choice is **SQLite** via **`sqflite`**:
 
----
-
-## Design Decisions
-
-### Multi-Tenancy (Per-User Data Isolation)
-
-Categories and subcategories are strictly scoped to the logged-in user:
-- SQLite table includes a `user_id INTEGER NOT NULL` column with index `idx_categories_user_id`.
-- The uniqueness constraint `UNIQUE(user_id, COALESCE(parent_id, 0), LOWER(name))` ensures that duplicate checking is scoped per user. Different users can independently create categories with the same name.
-- When User 1 logs in, only User 1's tree, search results, and nodes are queried and shown.
-- Logging out invalidates the tree and search states; User 2 sees only their own isolated categories.
-
-### The NULL-parent duplicate gotcha
-
-SQL `UNIQUE` indexes skip rows where any indexed column is NULL. That means `UNIQUE(parent_id, LOWER(name))` would allow two root categories with the same name (both `parent_id = NULL`). We solve this two ways:
-
-1. **Application-level check** in the repository: `WHERE LOWER(name) = LOWER(?) AND parent_id IS ?` — using `IS` (not `=`) so `NULL IS NULL` evaluates to true.
-2. **Safety-net index**: `CREATE UNIQUE INDEX ... ON categories(COALESCE(parent_id, 0), LOWER(name))` — COALESCE maps NULL to 0 (a sentinel that can never be a real ID), making the index cover root nodes correctly.
-
-### Why the tree is built in one pass
-
-Loading all categories once and grouping them in Dart is O(n) and makes exactly one SQL query regardless of tree depth. The alternative — fetching children lazily per node — would produce O(n) queries for an n-node tree (the N+1 problem), which is far worse.
-
-### Why search is paginated but the tree is loaded in full
-
-The tree is always displayed all at once with expand/collapse UX; the user navigates it with interactions, not scrolling through an infinite list. Loading it in full once is the right trade-off for the interactive tree. Search results, however, can be large and are presented as a flat list, so pagination is natural and keeps memory usage bounded.
+- **Relational Parent-Child fit:** Hierarchical category data is naturally relational. Storing nodes with `parent_id REFERENCES categories(id)` aligns with relational database capabilities.
+- **Foreign Keys & Cascading Deletes:** By executing `PRAGMA foreign_keys = ON` in `onConfigure`, deleting any parent node automatically deletes its entire child subtree in SQLite via `ON DELETE CASCADE`.
+- **Recursive CTE Support:** SQLite natively supports Common Table Expressions (`WITH RECURSIVE`), enabling single-query upward ancestral path traversal from any leaf to root.
+- **Indexed performance:** Dedicated indexes on `user_id`, `parent_id`, and `LOWER(name)` guarantee $O(\log n)$ queries even as datasets grow.
 
 ---
 
-## Running Tests
+## 5. Category Hierarchy Implementation
 
-```bash
-flutter test
+### Single-Pass $O(n)$ Tree Construction
+Rather than executing recursive $N+1$ database queries (which would result in high query latency on deep trees), the repository loads all user-scoped categories in a **single query**:
+1. Fetches all categories for the current user: `SELECT * FROM categories WHERE user_id = ? ORDER BY name ASC`.
+2. Groups categories in-memory into a `Map<int?, List<Category>>` keyed by `parent_id`.
+3. Recursively constructs `CategoryNode` trees beginning from `parent_id = null` (roots) down through leaves.
+4. **Time Complexity:** $O(n)$, making tree building instant for arbitrary depths (e.g., 6+ level chains).
+
+### Ancestor Path Traversal via Recursive CTE
+To resolve the full breadcrumb path from root to any arbitrary node (e.g., `Electronics › Mobile › Android › Samsung`), `getPath` executes a recursive Common Table Expression in SQLite:
+```sql
+WITH RECURSIVE ancestors(id, user_id, name, parent_id, created_at, depth) AS (
+  SELECT id, user_id, name, parent_id, created_at, 0
+  FROM categories WHERE id = ? AND user_id = ?
+  UNION ALL
+  SELECT c.id, c.user_id, c.name, c.parent_id, c.created_at, a.depth + 1
+  FROM categories c
+  JOIN ancestors a ON c.id = a.parent_id
+  WHERE c.user_id = ?
+)
+SELECT id, user_id, name, parent_id, created_at FROM ancestors
+ORDER BY depth DESC;
 ```
+Dart also features an in-memory parent-pointer lookup function (`_buildPath`) used for batch-populating search result cards.
 
-Tests cover:
-- Tree building (A→B→C→D→E→F chain, Electronics example)
-- Path resolution (root → deep node)
-- Duplicate rule (same parent rejected, different parent allowed, case-insensitive)
-- Pagination math (limit capping, offset calculation, total pages)
+---
+
+## 6. Search and Pagination Approach
+
+### Case-Insensitive Substring Match
+Search operates across all category names using SQL pattern matching:
+`WHERE user_id = ? AND LOWER(name) LIKE '%query%' ORDER BY name ASC`.
+
+### Total Count & Optional Limit
+1. **Total Count:** `SELECT COUNT(*) ...` determines the total matches matching the query.
+2. **Limit Parameter:** An optional user-selected `limit` (e.g., 10, 20, 50, or None) caps the effective total count to `min(totalCount, limit)`.
+3. **Pagination:** Items are fetched using standard SQL `LIMIT` and `OFFSET`:
+   `offset = (page - 1) * pageSize`.
+4. Results are wrapped in a generic `PagedResult<CategorySearchResult>` containing `items`, `page`, `pageSize`, and `totalCount`.
+
+### Enriched Search Context
+For each matched item on the page, the repository assembles:
+- **`match`**: The matching category entity.
+- **`parent`**: Direct parent category (if any).
+- **`children`**: List of immediate subcategories.
+- **`path`**: Full ancestral chain from root to match.
+
+### UI Debouncing
+Input on the `SearchBar` is debounced by **300ms** to prevent redundant database queries while the user is typing.
+
+---
+
+## 7. Additional Architectural Decisions
+
+### Multi-Tenancy (Data Isolation)
+Categories are strictly scoped to the authenticated user via `user_id`:
+- Uniqueness constraint: `UNIQUE(user_id, COALESCE(parent_id, 0), LOWER(name))`.
+- Different users can have identical category names without collisions.
+- Logging out clears the state; logging in with another account displays only that account's categories.
+
+### The NULL-Parent Duplicate Gotcha
+SQL `UNIQUE` constraints ignore `NULL` values. To prevent duplicate root categories under the same parent (`parent_id IS NULL`), two safeguards are implemented:
+1. Application-level check: `WHERE user_id = ? AND LOWER(name) = LOWER(?) AND parent_id IS ?` (using SQL `IS` instead of `=`).
+2. Database index safety net: `CREATE UNIQUE INDEX ... ON categories(user_id, COALESCE(parent_id, 0), LOWER(name))` where `COALESCE` maps `NULL` to `0`.
+
+### Black & White Minimalist UI
+The user interface implements a monochrome design system inspired by modern tools (Vercel, Linear):
+- Crisp white surfaces (`#FFFFFF`) with neutral zinc borders (`#E4E4E7`).
+- Deep pitch black (`#09090B`) primary buttons and interactive accents.
+- Animated top-floating alert SnackBar for invalid authentication credentials.

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
+import '../data/category_model.dart';
 import 'category_controller.dart';
 import 'widgets/add_category_dialog.dart';
 import 'widgets/category_tree_tile.dart';
@@ -155,9 +156,31 @@ class _TreeView extends ConsumerWidget {
 
   final dynamic repo; // CategoryRepository
 
+  int _countTotal(List<CategoryNode> nodes) {
+    int count = 0;
+    for (final node in nodes) {
+      count += 1 + _countTotal(node.children);
+    }
+    return count;
+  }
+
+  Set<int> _collectParentIds(List<CategoryNode> nodes) {
+    final ids = <int>{};
+    for (final node in nodes) {
+      if (node.children.isNotEmpty) {
+        ids.add(node.category.id);
+        ids.addAll(_collectParentIds(node.children));
+      }
+    }
+    return ids;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final treeState = ref.watch(categoryTreeProvider);
+    final expandedIds = ref.watch(expandedIdsProvider);
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return treeState.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -170,17 +193,63 @@ class _TreeView extends ConsumerWidget {
           return const EmptyState(
             icon: Icons.account_tree_outlined,
             title: 'No categories yet',
-            subtitle: 'Tap + to add your first category.',
+            subtitle: 'Tap "+ Add Category" below to create your first root category.',
           );
         }
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 100),
-          itemCount: roots.length,
-          itemBuilder: (_, i) => CategoryTreeTile(
-            node: roots[i],
-            depth: 0,
-            repo: repo,
-          ),
+
+        final totalCount = _countTotal(roots);
+        final parentIds = _collectParentIds(roots);
+        final allExpanded = parentIds.isNotEmpty && parentIds.every(expandedIds.contains);
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+          children: [
+            // Tree controls header
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8, top: 4),
+              child: Row(
+                children: [
+                  Text(
+                    '$totalCount ${totalCount == 1 ? 'category' : 'categories'}',
+                    style: tt.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (parentIds.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () {
+                        if (allExpanded) {
+                          ref.read(expandedIdsProvider.notifier).collapseAll();
+                        } else {
+                          ref.read(expandedIdsProvider.notifier).expandAll(parentIds);
+                        }
+                      },
+                      icon: Icon(
+                        allExpanded
+                            ? Icons.unfold_less_rounded
+                            : Icons.unfold_more_rounded,
+                        size: 16,
+                      ),
+                      label: Text(allExpanded ? 'Collapse all' : 'Expand all'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: cs.primary,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // Root tiles
+            for (final root in roots)
+              CategoryTreeTile(
+                node: root,
+                depth: 0,
+                repo: repo,
+              ),
+          ],
         );
       },
     );

@@ -90,13 +90,36 @@ class _AddCategoryDialogState extends State<_AddCategoryDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (widget.parentName != null) ...[
-              Text(
-                'Adding under: ${widget.parentName}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: cs.outlineVariant),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.subdirectory_arrow_right_rounded,
+                      size: 16,
+                      color: cs.primary,
                     ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Under: ${widget.parentName}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurface,
+                            ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
             ],
             TextFormField(
               controller: _ctrl,

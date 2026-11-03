@@ -95,6 +95,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isLoading = ref.watch(authControllerProvider).isLoading;
 
     return Scaffold(
+      backgroundColor: cs.surfaceContainerLow,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -103,7 +104,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               constraints: const BoxConstraints(maxWidth: 420),
               child: Card(
                 elevation: 0,
-                color: cs.surfaceContainerHighest,
+                color: cs.surface,
                 child: Padding(
                   padding: const EdgeInsets.all(28),
                   child: Form(

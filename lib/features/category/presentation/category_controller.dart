@@ -60,6 +60,10 @@ class ExpandedIdsNotifier extends Notifier<Set<int>> {
     state = {...state, ...ids};
   }
 
+  void collapseAll() {
+    state = {};
+  }
+
   void clear() {
     state = {};
   }
